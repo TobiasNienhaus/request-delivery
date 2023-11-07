@@ -1,0 +1,13 @@
+<div *ngIf="hasBody()" [ngSwitch]="bodyType">
+  <ngx-json-viewer
+    *ngSwitchCase="'json'"
+    [json]="formattedBody"
+  ></ngx-json-viewer>
+  <ngx-json-viewer
+    *ngSwitchCase="'xml'"
+    [json]="formattedBody"
+  ></ngx-json-viewer>
+  <div *ngSwitchDefault class="font-mono">
+    {{ formattedBody }}
+  </div>
+</div>

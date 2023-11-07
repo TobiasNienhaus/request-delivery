@@ -1,0 +1,83 @@
+<mat-accordion>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title>Headers</mat-panel-title>
+    </mat-expansion-panel-header>
+    <table
+      mat-table
+      [dataSource]="headers"
+      class="mat-elevation-z8"
+      *ngIf="headers.length > 0"
+    >
+      <ng-container matColumnDef="header">
+        <th mat-header-cell *matHeaderCellDef>Header</th>
+        <td mat-cell *matCellDef="let element">
+          {{ element.header | uppercase }}
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="values">
+        <th mat-header-cell *matHeaderCellDef>Value</th>
+        <td mat-cell *matCellDef="let element">
+          <span *ngFor="let value of element.values">{{ value }}<br /></span>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="['header', 'values']"></tr>
+      <tr mat-row *matRowDef="let row; columns: ['header', 'values']"></tr>
+    </table>
+  </mat-expansion-panel>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title>Cookies</mat-panel-title>
+    </mat-expansion-panel-header>
+    <table
+      mat-table
+      [dataSource]="cookies"
+      class="mat-elevation-z8"
+      *ngIf="cookies.length > 0"
+    >
+      <ng-container matColumnDef="cookie">
+        <th mat-header-cell *matHeaderCellDef>Cookie</th>
+        <td mat-cell *matCellDef="let element">{{ element.cookie }}</td>
+      </ng-container>
+      <ng-container matColumnDef="values">
+        <th mat-header-cell *matHeaderCellDef>Value</th>
+        <td mat-cell *matCellDef="let element">
+          <span *ngFor="let value of element.values">{{ value }}<br /></span>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="['cookie', 'values']"></tr>
+      <tr mat-row *matRowDef="let row; columns: ['cookie', 'values']"></tr>
+    </table>
+  </mat-expansion-panel>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title>Remote Info</mat-panel-title>
+    </mat-expansion-panel-header>
+    <h2>Host</h2>
+    <p>{{ requestEvent.remote.host }}</p>
+    <h2>Remote IP</h2>
+    <p>{{ requestEvent.remote.remoteIp || "None" }}</p>
+    <h2>Header IP</h2>
+    <p>{{ requestEvent.remote.headerIp || "None" }}</p>
+    <h2>Host</h2>
+    <p>{{ requestEvent.remote.clientIp || "None" }}</p>
+  </mat-expansion-panel>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title>Body</mat-panel-title>
+      <mat-panel-description>{{
+        requestEvent.contentType
+      }}</mat-panel-description>
+    </mat-expansion-panel-header>
+    <app-request-body [requestEvent]="requestEvent"></app-request-body>
+  </mat-expansion-panel>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title>Raw Body</mat-panel-title>
+    </mat-expansion-panel-header>
+    <pre
+      *ngIf="requestEvent.body"
+    ><code [highlight]="requestEvent.body" [lineNumbers]="true"></code></pre>
+    <pre *ngIf="!requestEvent.body"><i>No Body</i></pre>
+  </mat-expansion-panel>
+</mat-accordion>
