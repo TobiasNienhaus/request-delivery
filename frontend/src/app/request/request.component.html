@@ -62,7 +62,7 @@
     <h2>Host</h2>
     <p>{{ requestEvent.remote.clientIp || "None" }}</p>
   </mat-expansion-panel>
-  <mat-expansion-panel>
+  <mat-expansion-panel *ngIf="canShowFormatted">
     <mat-expansion-panel-header>
       <mat-panel-title>Body</mat-panel-title>
       <mat-panel-description>{{

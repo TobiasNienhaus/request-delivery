@@ -2,16 +2,20 @@
 extern crate rocket;
 
 use chrono::{DateTime, Utc};
+use config::{Config, File as ConfigFile, FileFormat};
 use dashmap::DashMap;
 use futures_channel::mpsc::{channel, Sender};
 use futures_concurrency::prelude::*;
 use rocket::data::{FromData, Outcome, ToByteUnit};
+use rocket::fs::{FileServer, NamedFile, Options};
 use rocket::futures::{SinkExt, StreamExt};
 use rocket::http::{Method, Status};
 use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use uuid::{Error, Uuid};
 // use std::sync::mpsc::{Sender, channel};
+use lazy_static::lazy_static;
 use multimap::MultiMap;
 use rocket::http::ext::IntoOwned;
 use rocket::http::uri::{Host, Origin};
@@ -20,6 +24,12 @@ use rocket::request::{FromParam, FromRequest};
 use rocket::serde::Serialize;
 use rocket::{Data, Request, State};
 use ws::Message;
+
+lazy_static! {
+    static ref CONFIG: Config = load_config().unwrap();
+    static ref UI_PATH: String = CONFIG.get("ui.path").unwrap();
+    static ref ANGULAR_INDEX: PathBuf = Path::new(UI_PATH.as_str()).join("index.html");
+}
 
 pub struct ID(Uuid);
 
@@ -189,10 +199,32 @@ fn echo_stream(id: ID, ws: ws::WebSocket, map: &State<ThingMap>) -> ws::Stream![
     }
 }
 
+fn load_config() -> Result<Config, ()> {
+    let builder = Config::builder().add_source(ConfigFile::new("config.ini", FileFormat::Ini));
+
+    match builder.build() {
+        Ok(config) => Ok(config),
+        Err(e) => {
+            eprintln!("Could not load config! {}", e);
+            Err(())
+        }
+    }
+}
+
+#[get("/<_..>")]
+async fn ui() -> NamedFile {
+    println!("Request");
+    NamedFile::open(ANGULAR_INDEX.as_path()).await.unwrap()
+}
+
 #[launch]
 fn rocket() -> _ {
-    rocket::build().manage(ThingMap::new()).mount(
-        "/",
-        routes![get, put, post, delete, head, options, patch, echo_stream],
-    )
+    rocket::build()
+        .manage(ThingMap::new())
+        .mount(
+            "/",
+            routes![get, put, post, delete, head, options, patch, echo_stream],
+        )
+        .mount("/ui", FileServer::from(UI_PATH.as_str()).rank(-5))
+        .mount("/ui", routes![ui])
 }

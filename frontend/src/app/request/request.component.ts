@@ -1,5 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { RequestData } from '../model/request';
+import { canShowInteractive } from '../model/format';
 
 @Component({
   selector: 'app-request',
@@ -25,5 +26,11 @@ export class RequestComponent {
       ret.push({ cookie: key, values: value });
     }
     return ret;
+  }
+
+  get canShowFormatted(): boolean {
+    return this.requestEvent?.contentType
+      ? canShowInteractive(this.requestEvent.contentType)
+      : false;
   }
 }

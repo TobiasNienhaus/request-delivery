@@ -26,6 +26,7 @@ import {
   HighlightModule,
   HighlightOptions,
 } from 'ngx-highlightjs';
+import { APP_BASE_HREF } from '@angular/common';
 
 @NgModule({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
