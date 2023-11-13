@@ -73,3 +73,6 @@ import { APP_BASE_HREF } from '@angular/common';
   bootstrap: [AppComponent],
 })
 export class AppModule {}
+
+// TODO QR Code with credentials so you can view the calls on another device
+// TODO Option to copy X-Auth-Token

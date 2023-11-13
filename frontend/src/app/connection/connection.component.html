@@ -6,8 +6,8 @@
     <span class="overflow-hidden grow"
       >Request to <span class="font-mono">/send/{{ id }}</span></span
     >
+    @if (id) {
     <button
-      *ngIf="id"
       mat-icon-button
       aria-label="Copy URL"
       ngxClipboard
@@ -17,6 +17,7 @@
     >
       <mat-icon>content_copy</mat-icon>
     </button>
+    }
   </mat-toolbar>
 
   <!-- <mat-drawer-container class="example-container grow">
@@ -31,25 +32,28 @@
       class="overflow-scroll overflow-x-hidden"
     >
       <mat-nav-list class="w-56">
+        @for (event of events; track event.time) {
         <mat-list-item
           [activated]="event === selectedEvent"
-          *ngFor="let event of events"
           (click)="selectedEvent = event"
         >
           <span matListItemTitle>{{ event.method }}</span>
           <span matListItemLine>{{ event.time }}</span>
         </mat-list-item>
+        }
       </mat-nav-list>
     </mat-sidenav>
 
     <mat-sidenav-content class="overflow-scroll">
-      <div *ngIf="selectedEvent" class="p-8">
+      @if (selectedEvent) {
+      <div class="p-8">
         <h1>
           <span class="font-mono">{{ selectedEvent.method }}</span>
         </h1>
         <h4>{{ selectedEvent.time }}</h4>
         <app-request [requestEvent]="selectedEvent"></app-request>
       </div>
+      }
     </mat-sidenav-content>
   </mat-sidenav-container>
 </div>
