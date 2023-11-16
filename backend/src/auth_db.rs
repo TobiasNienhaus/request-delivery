@@ -43,11 +43,16 @@ async fn db_setup_internal(rocket: Rocket<Build>) -> Result<Rocket<Build>, Rocke
 #[derive(Clone)]
 pub struct AuthGuardDb {
     id: String,
+    token: String,
 }
 
 impl AuthGuardDb {
     pub fn id_matches(&self, id: &str) -> bool {
         self.id.eq(id)
+    }
+
+    pub fn token(&self) -> &str {
+        &self.token
     }
 }
 
@@ -55,6 +60,7 @@ impl FromRow<'_, SqliteRow> for AuthGuardDb {
     fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
         Ok(Self {
             id: row.try_get("id")?,
+            token: row.try_get("token")?,
         })
     }
 }
@@ -70,7 +76,7 @@ impl<'r> FromRequest<'r> for AuthGuardDb {
         if let Some(token) = req.headers().get(AUTH_HEADER).next() {
             if let request::Outcome::Success(mut db) = req.guard::<Connection<AuthDb>>().await {
                 if let Ok(auth) =
-                    sqlx::query_as::<_, AuthGuardDb>("SELECT id FROM auth WHERE token = ?;")
+                    sqlx::query_as::<_, AuthGuardDb>("SELECT id, token FROM auth WHERE token = ?;")
                         .bind(token)
                         .fetch_one(&mut **db)
                         .await

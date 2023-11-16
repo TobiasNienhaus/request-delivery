@@ -77,3 +77,4 @@ export class AppModule {}
 
 // TODO QR Code with credentials so you can view the calls on another device
 // TODO Option to copy X-Auth-Token
+// TODO Option to generate Curl --> https://www.npmjs.com/package/curl-generator

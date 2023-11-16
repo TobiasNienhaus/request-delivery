@@ -7,10 +7,11 @@ use dashmap::DashMap;
 use futures_channel::mpsc::{channel, Sender};
 use futures_concurrency::prelude::*;
 use rocket::data::{FromData, Outcome, ToByteUnit};
+use rocket::fairing::AdHoc;
 use rocket::fs::{FileServer, NamedFile};
 use rocket::futures::{SinkExt, StreamExt};
 use rocket::http::{Method, Status};
-use rocket::response::content;
+use rocket::serde::json::Json;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -18,7 +19,6 @@ use uuid::{Error, Uuid};
 // use std::sync::mpsc::{Sender, channel};
 use lazy_static::lazy_static;
 use multimap::MultiMap;
-use nanoid::nanoid;
 use rocket::http::ext::IntoOwned;
 use rocket::http::uri::{Host, Origin};
 use rocket::outcome::Outcome::Success;
@@ -27,9 +27,8 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket::{Data, Request, State};
 use ws::Message;
 
-mod auth;
 mod auth_db;
-use auth::{Auth, AuthMap};
+use auth_db::{AuthGuardDb, NewAuth};
 
 lazy_static! {
     static ref CONFIG: Config = load_config().unwrap();
@@ -147,90 +146,64 @@ impl<'r> FromData<'r> for RequestData {
     }
 }
 
-type ThingMap = DashMap<Uuid, Vec<Sender<WsMessage>>>;
+type ThingMap = DashMap<String, Vec<Sender<WsMessage>>>;
 
 #[get("/send/<id>", data = "<input>")]
-async fn get(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
-    handle(id, map, input).await
+async fn get(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    handle(id, auth, map, input).await
 }
 
 #[put("/send/<id>", data = "<input>")]
-async fn put(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
-    handle(id, map, input).await
+async fn put(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    handle(id, auth, map, input).await
 }
 
 #[post("/send/<id>", data = "<input>")]
-async fn post(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
-    handle(id, map, input).await
+async fn post(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    handle(id, auth, map, input).await
 }
 
 #[delete("/send/<id>", data = "<input>")]
-async fn delete(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
-    handle(id, map, input).await
+async fn delete(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    handle(id, auth, map, input).await
 }
 
 #[head("/send/<id>", data = "<input>")]
-async fn head(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
-    handle(id, map, input).await
+async fn head(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    handle(id, auth, map, input).await
 }
 
 #[options("/send/<id>", data = "<input>")]
-async fn options(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
-    handle(id, map, input).await
+async fn options(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    handle(id, auth, map, input).await
 }
 
 #[patch("/send/<id>", data = "<input>")]
-async fn patch(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
-    handle(id, map, input).await
-}
-
-#[derive(Clone, Serialize)]
-struct RegisterResult {
-    id: Uuid,
-    auth: String,
-}
-
-impl RegisterResult {
-    fn new() -> RegisterResult {
-        RegisterResult {
-            id: Uuid::new_v4(),
-            auth: nanoid!(),
-        }
-    }
+async fn patch(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    handle(id, auth, map, input).await
 }
 
 #[post("/register")]
-async fn register(auth_map: &State<AuthMap>) -> Result<content::RawJson<String>, Status> {
-    let res = RegisterResult::new();
-    if auth_map.contains_id(res.id) {
-        Err(Status::Unauthorized)
-    } else {
-        auth_map.add(res.id, res.auth.clone());
-        match serde_json::to_string(&res) {
-            Ok(s) => Ok(content::RawJson(s)),
-            Err(_) => Err(Status::Unauthorized),
-        }
-    }
+async fn register(new_auth: NewAuth) -> (Status, Json<NewAuth>) {
+    (Status::Created, Json(new_auth))
 }
 
 // TODO clear out sockets and auths after some time
 
 #[head("/validate/<id>")]
-async fn validate(id: ID, auth: Auth, auth_map: &State<AuthMap>) -> Result<(), Status> {
-    if let Some(existing) = auth_map.clone_token(id.0) {
-        if auth.0.ne(&existing) {
-            Err(Status::Unauthorized)
-        } else {
-            Ok(())
-        }
-    } else {
-        Err(Status::NotFound)
+async fn validate(id: &str, auth: AuthGuardDb) -> Result<(), Status> {
+    if !auth.id_matches(id) {
+        return Err(Status::Unauthorized);
     }
+    Ok(())
 }
 
-async fn handle(id: ID, map: &State<ThingMap>, input: RequestData) -> Status {
+async fn handle(id: &str, auth: AuthGuardDb, map: &State<ThingMap>, input: RequestData) -> Status {
+    if !auth.id_matches(&id) {
+        return Status::Unauthorized;
+    }
     let mut has_sent = false;
-    if let Some(mut senders) = map.get_mut(&id.0) {
+    if let Some(mut senders) = map.get_mut(id) {
         for sender in senders.value() {
             if !sender.is_closed() {
                 has_sent = true;
@@ -253,7 +226,7 @@ async fn handle(id: ID, map: &State<ThingMap>, input: RequestData) -> Status {
         return Status::Accepted;
     }
     println!("Removing, as nothing has been sent");
-    map.remove(&id.0);
+    map.remove(id);
     Status::NotFound
 }
 
@@ -264,80 +237,59 @@ enum MyMessage {
 
 #[get("/connect/<id>")]
 fn websocket<'r>(
-    id: ID,
+    id: &'r str,
+    auth: AuthGuardDb,
     ws: ws::WebSocket,
-    map: &State<ThingMap>,
-    auth_map: &'r rocket::State<AuthMap>,
+    map: &'r State<ThingMap>,
 ) -> ws::Stream!['r] {
-    if !map.contains_key(&id.0) {
-        map.insert(id.0, vec![]);
-    }
     let (sender, receiver) = channel(8);
-    map.alter(&id.0, move |_, mut v| {
-        v.push(sender);
-        v
-    });
-    ws::Stream! { ws =>
-        let mut authenticated = false;
 
-        let w = ws.map(MyMessage::In);
-        let re = receiver.map(MyMessage::Out);
-        for await message in (re, w).merge() {
-            match message {
-                MyMessage::In(msg) => {
-                    if let Ok(msg) = msg {
-                        if !authenticated {
-                            let auth_result = handle_ws_auth(id.clone(), msg, auth_map);
-                            if !auth_result {
-                                yield serde_json::to_string(&InOutMessage::AuthResponse{ ok: false }).unwrap_or("AAA".to_string()).into();
+    ws::Stream! { ws =>
+        if auth.id_matches(id) {
+            if !map.contains_key(id) {
+                map.insert(id.to_owned(), vec![]);
+            }
+            map.alter(id, |_, mut v| {
+                v.push(sender.clone());
+                v
+            });
+
+            let w = ws.map(MyMessage::In);
+            let re = receiver.map(MyMessage::Out);
+            for await message in (re, w).merge() {
+                match message {
+                    MyMessage::In(msg) => {
+                        match msg {
+                            Ok(msg) => {
+                                match msg {
+                                    Message::Close(_) => {
+                                        println!("Websocket closed");
+                                        break;
+                                    },
+                                    _ => println!("Websocket Message: {:?}", msg)
+                                }
+                            },
+                            Err(e) => {
+                                eprintln!("Error in WS Reception: {e}");
                                 break;
                             }
-                            authenticated = true;
-                            yield serde_json::to_string(&InOutMessage::AuthResponse{ ok: true }).unwrap_or("ERROR".to_string()).into();
-                        } else {
-                            match msg {
-                                Message::Close(_) => {
-                                    println!("Websocket closed");
-                                    break;
-                                },
-                                _ => println!("Websocket Message: {:?}", msg)
+                        }
+                    },
+                    MyMessage::Out(rd) => {
+                        match rd {
+                            WsMessage::Shutdown => {
+                                yield Message::Close(None);
+                                break;
                             }
+                            WsMessage::Formatted(msg) => yield serde_json::to_string(&msg).unwrap_or("ERROR".to_string()).into()
                         }
-                    } else {
-                        println!("Error in WS Reception");
-                        break;
-                    }
-                },
-                MyMessage::Out(rd) => {
-                    match rd {
-                        WsMessage::Shutdown => {
-                            yield Message::Close(None);
-                            break;
-                        }
-                        WsMessage::Formatted(msg) => yield serde_json::to_string(&msg).unwrap_or("ERROR".to_string()).into()
                     }
                 }
             }
+        } else {
+            yield "Unauthorized".into();
         }
     }
-}
-
-fn handle_ws_auth(id: ID, msg: Message, auth_map: &State<AuthMap>) -> bool {
-    if let Message::Text(txt) = msg {
-        match serde_json::from_str(&txt) {
-            Ok(des) => {
-                if let Some(InOutMessage::Auth { token: auth }) = des {
-                    if let Some(t) = auth_map.clone_token(id.0) {
-                        return t.eq(&auth);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Could not deserialize: {e}");
-            }
-        }
-    }
-    false
 }
 
 fn load_config() -> Result<Config, ()> {
@@ -368,6 +320,22 @@ fn rocket() -> _ {
         )
         .mount("/ui", FileServer::from(UI_PATH.as_str()).rank(-5))
         .mount("/ui", routes![ui]);
-    let r = auth::setup_rocket(r);
-    auth_db::attach_db(r)
+    auth_db::attach_db(r).attach(AdHoc::on_shutdown("Close Websockets", |r| {
+        Box::pin(async move {
+            if let Some(thingies) = r.state::<ThingMap>() {
+                for mut i in thingies.iter_mut() {
+                    let key = i.key().clone();
+                    for s in i.value_mut() {
+                        if !s.is_closed() {
+                            if let Err(e) = s.send(WsMessage::Shutdown).await {
+                                eprintln!("Could not shut down {key}: {e}")
+                            } else {
+                                println!("Shutdown for {key} successful")
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }))
 }
