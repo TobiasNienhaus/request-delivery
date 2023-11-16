@@ -10,6 +10,7 @@ use rocket::data::{FromData, Outcome, ToByteUnit};
 use rocket::fs::{FileServer, NamedFile};
 use rocket::futures::{SinkExt, StreamExt};
 use rocket::http::{Method, Status};
+use rocket::response::content;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -21,18 +22,20 @@ use nanoid::nanoid;
 use rocket::http::ext::IntoOwned;
 use rocket::http::uri::{Host, Origin};
 use rocket::outcome::Outcome::Success;
-use rocket::request::{self, FromParam, FromRequest};
+use rocket::request::FromParam;
 use rocket::serde::{Deserialize, Serialize};
 use rocket::{Data, Request, State};
 use ws::Message;
+
+mod auth;
+mod auth_db;
+use auth::{Auth, AuthMap};
 
 lazy_static! {
     static ref CONFIG: Config = load_config().unwrap();
     static ref UI_PATH: String = CONFIG.get("ui.path").unwrap();
     static ref ANGULAR_INDEX: PathBuf = Path::new(UI_PATH.as_str()).join("index.html");
 }
-
-static AUTH_HEADER: &'static str = "X-Auth";
 
 #[derive(Clone, Copy)]
 pub struct ID(Uuid);
@@ -48,29 +51,6 @@ impl<'a> FromParam<'a> for ID {
     }
 }
 
-#[derive(Clone, Serialize)]
-pub struct Auth(String);
-unsafe impl Send for Auth {}
-unsafe impl Sync for Auth {}
-
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for Auth {
-    type Error = ();
-
-    async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
-        if let Success(v) = req.guard::<&State<AuthMap>>().await {
-            for h in req.headers().get(AUTH_HEADER) {
-                if v.contains_value(h) {
-                    return request::Outcome::Success(Auth(h.to_owned()));
-                }
-            }
-        } else {
-            eprintln!("No AuthMap!!!");
-            return request::Outcome::Error((Status::InternalServerError, ()));
-        }
-        request::Outcome::Error((Status::Unauthorized, ()))
-    }
-}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestData {
@@ -169,61 +149,6 @@ impl<'r> FromData<'r> for RequestData {
 
 type ThingMap = DashMap<Uuid, Vec<Sender<WsMessage>>>;
 
-#[derive(Clone)]
-struct AuthMap {
-    ids: DashMap<Uuid, String>,
-    tokens: DashMap<String, Uuid>,
-}
-
-unsafe impl Send for AuthMap {}
-unsafe impl Sync for AuthMap {}
-
-impl AuthMap {
-    fn contains_id(&self, id: Uuid) -> bool {
-        self.ids.contains_key(&id)
-    }
-
-    fn contains_value(&self, val: &str) -> bool {
-        self.tokens.contains_key(val)
-    }
-
-    fn add(&self, id: Uuid, token: String) -> bool {
-        if self.ids.contains_key(&id) || self.tokens.contains_key(&token) {
-            false
-        } else {
-            self.ids.insert(id, token.clone());
-            self.tokens.insert(token, id);
-            true
-        }
-    }
-
-    fn remove(&self, id: Uuid) -> bool {
-        if let Some((k, v)) = self.ids.remove(&id) {
-            let tval = self.tokens.get(&v);
-            tval.map_or(false, |v| {
-                let v = v.eq(&id);
-                if !v {
-                    eprintln!("IDS NOT EQUAL")
-                }
-                v
-            })
-        } else {
-            false
-        }
-    }
-
-    fn clone_token(&self, id: Uuid) -> Option<String> {
-        self.ids.get(&id).map(|s| s.clone())
-    }
-
-    fn new() -> Self {
-        AuthMap {
-            ids: DashMap::new(),
-            tokens: DashMap::new(),
-        }
-    }
-}
-
 #[get("/send/<id>", data = "<input>")]
 async fn get(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> Status {
     handle(id, map, input).await
@@ -259,16 +184,36 @@ async fn patch(id: ID, _a: Auth, map: &State<ThingMap>, input: RequestData) -> S
     handle(id, map, input).await
 }
 
-#[post("/register/<id>")]
-async fn register(id: ID, auth_map: &State<AuthMap>) -> Result<String, Status> {
-    if auth_map.contains_id(id.0) {
-        Err(Status::Unauthorized)
-    } else {
-        let auth = nanoid!();
-        auth_map.add(id.0, auth.clone());
-        Ok(auth)
+#[derive(Clone, Serialize)]
+struct RegisterResult {
+    id: Uuid,
+    auth: String,
+}
+
+impl RegisterResult {
+    fn new() -> RegisterResult {
+        RegisterResult {
+            id: Uuid::new_v4(),
+            auth: nanoid!(),
+        }
     }
 }
+
+#[post("/register")]
+async fn register(auth_map: &State<AuthMap>) -> Result<content::RawJson<String>, Status> {
+    let res = RegisterResult::new();
+    if auth_map.contains_id(res.id) {
+        Err(Status::Unauthorized)
+    } else {
+        auth_map.add(res.id, res.auth.clone());
+        match serde_json::to_string(&res) {
+            Ok(s) => Ok(content::RawJson(s)),
+            Err(_) => Err(Status::Unauthorized),
+        }
+    }
+}
+
+// TODO clear out sockets and auths after some time
 
 #[head("/validate/<id>")]
 async fn validate(id: ID, auth: Auth, auth_map: &State<AuthMap>) -> Result<(), Status> {
@@ -415,13 +360,14 @@ async fn ui() -> NamedFile {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build()
+    let r = rocket::build()
         .manage(ThingMap::new())
-        .manage(AuthMap::new())
         .mount(
             "/",
             routes![get, put, post, delete, head, options, patch, websocket, register, validate],
         )
         .mount("/ui", FileServer::from(UI_PATH.as_str()).rank(-5))
-        .mount("/ui", routes![ui])
+        .mount("/ui", routes![ui]);
+    let r = auth::setup_rocket(r);
+    auth_db::attach_db(r)
 }

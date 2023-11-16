@@ -26,7 +26,7 @@ import {
   HighlightModule,
   HighlightOptions,
 } from 'ngx-highlightjs';
-import { APP_BASE_HREF } from '@angular/common';
+import { HttpClientModule } from '@angular/common/http';
 
 @NgModule({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -53,6 +53,7 @@ import { APP_BASE_HREF } from '@angular/common';
     HighlightModule,
     ClipboardModule,
     MatSnackBarModule,
+    HttpClientModule,
   ],
   providers: [
     {
