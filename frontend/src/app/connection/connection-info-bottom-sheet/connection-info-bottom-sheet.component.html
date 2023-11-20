@@ -1,0 +1,64 @@
+<div class="max-w-xl mr-auto ml-auto">
+  <mat-form-field class="pt-4 w-full">
+    <mat-label>ID</mat-label>
+    <input matInput disabled value="{{ id }}" />
+    <button
+      mat-icon-button
+      matSuffix
+      aria-label="Copy ID"
+      ngxClipboard
+      [cbContent]="id"
+      (cbOnSuccess)="onCopy($event)"
+      (cbOnError)="onCopy($event)"
+    >
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </mat-form-field>
+  <mat-form-field class="w-full">
+    <mat-label>X-Auth</mat-label>
+    <input matInput disabled value="{{ token }}" />
+    <button
+      mat-icon-button
+      matSuffix
+      aria-label="Copy Token"
+      ngxClipboard
+      [cbContent]="token"
+      (cbOnSuccess)="onCopy($event)"
+      (cbOnError)="onCopy($event)"
+    >
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </mat-form-field>
+
+  <mat-form-field class="w-full">
+    <mat-label>Reconnect URL</mat-label>
+    <input matInput disabled value="{{ qrUrl }}" />
+    <button
+      mat-icon-button
+      matSuffix
+      aria-label="Copy Reconnect URL"
+      ngxClipboard
+      [cbContent]="qrUrl"
+      (cbOnSuccess)="onCopy($event)"
+      (cbOnError)="onCopy($event)"
+    >
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </mat-form-field>
+  <div>
+    <p>
+      To also receive requests in another browser, use the Reconnect URL up top
+      or scan the QR-Code
+    </p>
+  </div>
+  <div class="text-center">
+    <qr-code
+      class="max-w-full"
+      [value]="qrUrl"
+      size="300"
+      errorCorrectionLevel="M"
+      darkColor="#FFFFFFFF"
+      lightColor="#00000000"
+    ></qr-code>
+  </div>
+</div>

@@ -1,3 +1,4 @@
+use crate::AUTH_HEADER;
 use nanoid::nanoid;
 use rocket::{
     fairing::AdHoc,
@@ -11,11 +12,9 @@ use rocket_db_pools::{
 };
 use serde::Serialize;
 
-static AUTH_HEADER: &'static str = "X-Auth";
-
 #[derive(Database)]
 #[database("auth")]
-struct AuthDb(sqlx::SqlitePool);
+pub struct AuthDb(sqlx::SqlitePool);
 
 pub fn attach_db(rocket: Rocket<Build>) -> Rocket<Build> {
     let rocket = rocket.attach(AuthDb::init());
@@ -26,12 +25,13 @@ pub fn attach_db(rocket: Rocket<Build>) -> Rocket<Build> {
 async fn db_setup_internal(rocket: Rocket<Build>) -> Result<Rocket<Build>, Rocket<Build>> {
     let db = AuthDb::fetch(&rocket).unwrap();
     if let Err(e) = sqlx::query(
-        "CREATE TABLE auth (
+        "CREATE TABLE IF NOT EXISTS auth (
         id TEXT PRIMARY KEY,
         token TEXT UNIQUE)",
     )
     .execute(&**db)
     .await
+    .and(sqlx::query("DELETE FROM auth;").execute(&**db).await)
     {
         eprintln!("Could not execute setup for AuthDB: {e:?}");
         Err(rocket)
@@ -40,7 +40,7 @@ async fn db_setup_internal(rocket: Rocket<Build>) -> Result<Rocket<Build>, Rocke
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AuthGuardDb {
     id: String,
     token: String,
@@ -73,16 +73,24 @@ impl<'r> FromRequest<'r> for AuthGuardDb {
     type Error = ();
 
     async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
-        if let Some(token) = req.headers().get(AUTH_HEADER).next() {
-            if let request::Outcome::Success(mut db) = req.guard::<Connection<AuthDb>>().await {
-                if let Ok(auth) =
-                    sqlx::query_as::<_, AuthGuardDb>("SELECT id, token FROM auth WHERE token = ?;")
-                        .bind(token)
-                        .fetch_one(&mut **db)
-                        .await
-                {
-                    return request::Outcome::Success(auth);
-                }
+        for c in req.cookies().iter() {
+            println!("{}: {}", c.name(), c.value());
+        }
+        let token = if let Some(token) = req.headers().get(AUTH_HEADER).next() {
+            token
+        } else if let Some(Ok(token)) = req.query_value("token") {
+            token
+        } else {
+            return request::Outcome::Forward(Status::Unauthorized);
+        };
+        if let request::Outcome::Success(mut db) = req.guard::<Connection<AuthDb>>().await {
+            if let Ok(auth) =
+                sqlx::query_as::<_, AuthGuardDb>("SELECT id, token FROM auth WHERE token = ?;")
+                    .bind(token)
+                    .fetch_one(&mut **db)
+                    .await
+            {
+                return request::Outcome::Success(auth);
             }
         }
         request::Outcome::Forward(Status::Unauthorized)

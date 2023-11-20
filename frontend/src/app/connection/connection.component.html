@@ -25,23 +25,46 @@
     <mat-drawer-content>Main content</mat-drawer-content>
   </mat-drawer-container> -->
   <mat-sidenav-container class="example-sidenav-container grow" autosize>
-    <mat-sidenav
-      #snav
-      mode="side"
-      opened
-      class="overflow-scroll overflow-x-hidden"
-    >
-      <mat-nav-list class="w-56">
-        @for (event of events; track event.time) {
-        <mat-list-item
-          [activated]="event === selectedEvent"
-          (click)="selectedEvent = event"
-        >
-          <span matListItemTitle>{{ event.method }}</span>
-          <span matListItemLine>{{ event.time }}</span>
-        </mat-list-item>
+    <mat-sidenav #snav mode="side" opened>
+      <div class="flex flex-col h-full">
+        <mat-nav-list class="overflow-auto overflow-x-hidden">
+          @for (event of events; track event.time) {
+          <mat-list-item
+            [activated]="event === selectedEvent"
+            (click)="selectedEvent = event"
+          >
+            <span matListItemTitle>{{ event.method }}</span>
+            <span matListItemLine>{{
+              event.time | date : "cccc HH:mm:ss.SSS"
+            }}</span>
+          </mat-list-item>
+          }
+        </mat-nav-list>
+        <div class="grow"></div>
+        <mat-divider></mat-divider>
+        @if (!broken) {
+        <div class="p-2 px-4">
+          @if (hasConnection()) {
+          <button class="w-full" mat-button (click)="closeConnection()">
+            <mat-icon>close</mat-icon>
+            Close
+          </button>
+          } @else {
+          <button class="w-full" mat-button (click)="tryReopenConnection()">
+            <mat-icon>sensors</mat-icon>
+            Reopen
+          </button>
+          }
+        </div>
+
         }
-      </mat-nav-list>
+        <div class="p-2 px-4 flex items-center">
+          <div class="grow">Connection Info</div>
+          <button mat-icon-button (click)="openInfoSheet()">
+            <mat-icon>info_outlined</mat-icon>
+          </button>
+        </div>
+      </div>
     </mat-sidenav>
 
     <mat-sidenav-content class="overflow-scroll">

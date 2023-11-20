@@ -1,5 +1,39 @@
-<div class="w-full h-full flex items-center app-background p-16">
-  <div class="grow">A</div>
-  <mat-divider [vertical]="true"></mat-divider>
-  <div class="grow">B</div>
+<div
+  class="w-full h-full flex flex-col md:flex-row items-center app-background box-border p-8 py-16"
+>
+  @if (!large) {
+  <div class="grow"></div>
+  }
+  <div [class.grow]="large" class="p-8 text-center">
+    <button
+      mat-raised-button
+      color="accent"
+      (click)="registerNew()"
+      [disabled]="loading"
+    >
+      Create New
+    </button>
+  </div>
+  <mat-divider
+    [class]="large ? 'h-full' : 'w-full'"
+    [vertical]="large"
+  ></mat-divider>
+  <div [class.grow]="large" class="grow p-8 text-center">
+    <form>
+      <mat-form-field>
+        <mat-label>Input</mat-label>
+        <input matInput />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Select</mat-label>
+        <mat-select>
+          <mat-option value="one">First option</mat-option>
+          <mat-option value="two">Second option</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </form>
+  </div>
+  @if (!large) {
+  <div class="grow"></div>
+  }
 </div>

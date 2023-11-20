@@ -27,6 +27,13 @@ import {
   HighlightOptions,
 } from 'ngx-highlightjs';
 import { HttpClientModule } from '@angular/common/http';
+import { LayoutModule } from '@angular/cdk/layout';
+import { CookieService } from 'ngx-cookie-service';
+import { MatBottomSheetModule } from '@angular/material/bottom-sheet';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { ConnectionInfoBottomSheetComponent } from './connection/connection-info-bottom-sheet/connection-info-bottom-sheet.component';
+import { QrCodeModule } from 'ng-qrcode';
 
 @NgModule({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -37,6 +44,7 @@ import { HttpClientModule } from '@angular/common/http';
     RequestComponent,
     RequestBodyComponent,
     UrlFormTableComponent,
+    ConnectionInfoBottomSheetComponent,
   ],
   imports: [
     MatButtonModule,
@@ -54,6 +62,11 @@ import { HttpClientModule } from '@angular/common/http';
     ClipboardModule,
     MatSnackBarModule,
     HttpClientModule,
+    LayoutModule,
+    MatBottomSheetModule,
+    MatFormFieldModule,
+    MatInputModule,
+    QrCodeModule,
   ],
   providers: [
     {
@@ -70,6 +83,7 @@ import { HttpClientModule } from '@angular/common/http';
         // },
       },
     },
+    CookieService,
   ],
   bootstrap: [AppComponent],
 })

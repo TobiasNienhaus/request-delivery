@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { CookieService } from 'ngx-cookie-service';
 
 const BASE_PATH = '';
 
@@ -9,16 +10,22 @@ const BASE_PATH = '';
 export class AuthService {
   token?: string;
 
-  constructor() {}
+  constructor(private cookies: CookieService) {
+    if (cookies.check('token')) {
+      this.token = cookies.get('token');
+    }
+  }
 
   async register_new(): Promise<string> {
+    this.cookies.delete('token');
     let res = await fetch(BASE_PATH + '/register', {
       method: 'POST',
     });
-    if (res.status == 200) {
+    if (res.status < 300) {
       let json = await res.json();
-      if ('id' in json && 'auth' in json) {
-        this.token = json['auth'];
+      if ('id' in json && 'token' in json) {
+        this.token = json['token'];
+        this.cookies.set('token', json['token']);
         return json['id'];
       }
       throw 'Unauthorized';
