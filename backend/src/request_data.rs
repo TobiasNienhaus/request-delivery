@@ -17,12 +17,14 @@ use rocket::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
+use base64::{engine::general_purpose::STANDARD as Base64, Engine as _};
+
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestData {
     method: Method,
     content_type: Option<String>,
-    body: Option<String>,
+    body: Option<Body>,
     complete: Option<bool>,
     headers: MultiMap<String, String>,
     cookies: MultiMap<String, String>,
@@ -30,6 +32,21 @@ pub struct RequestData {
     remote: RemoteInfo,
     // accepts: Option<> // TODO
     time: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Body {
+    raw: String,
+    base64: String,
+}
+
+impl Body {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let raw = String::from_utf8_lossy(bytes).into_owned();
+        let base64 = Base64.encode(bytes);
+        Self { raw, base64 }
+    }
 }
 
 unsafe impl Send for RequestData {}
@@ -56,12 +73,23 @@ impl<'r> FromData<'r> for RequestData {
             headers.insert(header.name.to_string(), header.value.to_string());
         }
 
-        let body = futures::executor::block_on(data.open(16.kibibytes()).into_string()).ok();
+        let body = match data.open(16.kibibytes()).into_bytes().await {
+            Ok(s) => Some(s),
+            Err(e) => {
+                println!("Error! {e}");
+                None
+            }
+        };
         let mut complete = None;
 
-        if let Some(ref b) = body {
-            complete = Some(b.is_complete());
-        }
+        let body = match body {
+            Some(b) => {
+                println!("body: {:?}", b);
+                complete = Some(b.is_complete());
+                Some(Body::from_bytes(&b.value))
+            }
+            None => None,
+        };
 
         let mut cookies = MultiMap::new();
 
@@ -74,7 +102,7 @@ impl<'r> FromData<'r> for RequestData {
             content_type: req
                 .content_type()
                 .map(|mt| format!("{}/{}", mt.0.top(), mt.0.sub())),
-            body: body.map(|b| b.value),
+            body,
             complete,
             headers,
             cookies,

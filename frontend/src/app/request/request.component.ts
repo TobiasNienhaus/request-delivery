@@ -1,6 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { RequestData } from '../model/request';
 import { canShowInteractive } from '../model/format';
+import * as mime from 'mime';
 
 @Component({
   selector: 'app-request',
@@ -32,5 +33,12 @@ export class RequestComponent {
     return this.requestEvent?.contentType
       ? canShowInteractive(this.requestEvent.contentType)
       : false;
+  }
+
+  get downloadExtension(): string {
+    if (this.requestEvent.contentType) {
+      return mime.getExtension(this.requestEvent.contentType) || 'bin';
+    }
+    return 'bin';
   }
 }

@@ -4,3 +4,9 @@ port = 18234
 
 [default.databases.auth]
 url = "./auth.sqlite"
+
+[default.req]
+ui_path = "../frontend/dist/frontend"
+my_epoch = "2021-11-22 0:0:0"
+cleanup_interval = 5
+max_age = 3600

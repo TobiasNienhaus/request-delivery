@@ -11,17 +11,17 @@ export type Method =
 
 export interface RequestData {
   method: Method;
-  contentType: string | null;
-  body: string | null;
-  complete: boolean | null;
+  contentType?: string;
+  body?: { raw: string; base64: string };
+  complete?: boolean;
   headers: Record<string, string[]>;
   cookies: Record<string, string[]>;
   uri: string;
   remote: {
-    host: string | null;
-    remoteIp: string | null;
-    headerIp: string | null;
-    clientIp: string | null;
+    host?: string;
+    remoteIp?: string;
+    headerIp?: string;
+    clientIp?: string;
   };
   time: Date;
 }
@@ -29,7 +29,10 @@ export interface RequestData {
 export let DEFAULT_REQUEST: RequestData = {
   method: 'POST',
   contentType: 'application/json',
-  body: '{\r\n    "Hallo": "Hallo",\r\n    "1": 1,\r\n    "nested": {\r\n        "nested": "A",\r\n        "1:1": 1\r\n    },\r\n    "arr": [\r\n        "A",\r\n        1,\r\n        "sldf",\r\n        {\r\n            "a": "a",\r\n            "b": "c"\r\n        }\r\n    ]\r\n}',
+  body: {
+    raw: '{\r\n    "Hallo": "Hallo",\r\n    "1": 1,\r\n    "nested": {\r\n        "nested": "A",\r\n        "1:1": 1\r\n    },\r\n    "arr": [\r\n        "A",\r\n        1,\r\n        "sldf",\r\n        {\r\n            "a": "a",\r\n            "b": "c"\r\n        }\r\n    ]\r\n}',
+    base64: 'Example',
+  },
   complete: true,
   headers: {
     'accept-encoding': ['gzip, deflate, br'],

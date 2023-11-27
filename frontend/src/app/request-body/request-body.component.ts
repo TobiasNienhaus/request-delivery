@@ -2,7 +2,6 @@ import { Component, Input, OnInit, SimpleChanges } from '@angular/core';
 import { RequestData } from '../model/request';
 
 import { BodyType, getBodyType } from '../model/format';
-import { DomSanitizer } from '@angular/platform-browser';
 
 import { XMLParser } from 'fast-xml-parser/src/fxp';
 
@@ -28,22 +27,24 @@ export class RequestBodyComponent {
     return getBodyType(this.requestEvent.contentType || '');
   }
 
-  constructor(private sanitizer: DomSanitizer) {}
+  constructor() {}
 
   getFormattedBody(): any {
-    if (!this.requestEvent.body) return 'UNDEFINED';
+    if (!this.requestEvent.body?.raw) return {};
     switch (this.bodyType) {
       case BodyType.Json:
-        return JSON.parse(this.requestEvent.body);
+        return JSON.parse(this.requestEvent.body.raw);
       case BodyType.Xml:
-        return new XMLParser().parse(this.requestEvent.body);
+        return new XMLParser().parse(this.requestEvent.body.raw);
       default:
-        console.log(this.requestEvent.body);
-        return this.requestEvent.body;
+        return {};
     }
   }
 
   hasBody(): boolean {
-    return this.requestEvent.body ? true : false;
+    return (
+      this.requestEvent.body !== null &&
+      this.bodyType in [BodyType.Json, BodyType.Xml]
+    );
   }
 }

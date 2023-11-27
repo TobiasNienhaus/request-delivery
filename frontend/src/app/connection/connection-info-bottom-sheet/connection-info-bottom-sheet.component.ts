@@ -29,7 +29,7 @@ export class ConnectionInfoBottomSheetComponent {
     return (
       window.location.origin +
       this.location.prepareExternalUrl(
-        `/reconnect/${this.id}?token=${this.token}`
+        `/reconnect/${this.id}` + (this.token ? `?token=${this.token}` : '')
       )
     );
   }

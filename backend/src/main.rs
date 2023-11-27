@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
-use config::{Config, File as ConfigFile, FileFormat};
+use chrono::NaiveDateTime;
 use dashmap::DashMap;
 use futures_channel::mpsc::{channel, Sender};
 use futures_concurrency::prelude::*;
@@ -10,29 +10,31 @@ use rocket::fs::{FileServer, NamedFile};
 use rocket::futures::{SinkExt, StreamExt};
 use rocket::http::Status;
 use rocket::serde::json::Json;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::sync::OnceLock;
 
-use uuid::{Error, Uuid};
-// use std::sync::mpsc::{Sender, channel};
 use lazy_static::lazy_static;
 use rocket::request::FromParam;
-use rocket::serde::{Deserialize, Serialize};
-use rocket::State;
+use rocket::serde::Deserialize;
+use rocket::{Request, State};
+use uuid::{Error, Uuid};
 use ws::Message;
 
-mod auth_db;
-use auth_db::NewAuth;
-mod auth_service;
-use auth_service::AuthService;
+mod auth;
+use auth::{Auth, AuthService, NewAuthService};
 mod request_data;
 use request_data::RequestData;
 
 static AUTH_HEADER: &'static str = "X-Auth";
 
+static CONFIG: OnceLock<Config> = OnceLock::new();
+
 lazy_static! {
-    static ref CONFIG: Config = load_config().unwrap();
-    static ref UI_PATH: String = CONFIG.get("ui.path").unwrap();
-    static ref ANGULAR_INDEX: PathBuf = Path::new(UI_PATH.as_str()).join("index.html");
+    static ref ANGULAR_INDEX: PathBuf = CONFIG.get().unwrap().ui_path.join("index.html");
+    static ref MY_EPOCH: NaiveDateTime =
+        NaiveDateTime::parse_from_str(&CONFIG.get().unwrap().my_epoch, "%Y-%m-%d %T")
+            .expect("Could not parse thing")
+            .into();
 }
 
 #[derive(Clone, Copy)]
@@ -52,15 +54,6 @@ impl<'a> FromParam<'a> for ID {
 #[derive(Clone)]
 enum WsMessage {
     Shutdown,
-    Formatted(InOutMessage),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "type")]
-enum InOutMessage {
-    Auth { token: String },
-    AuthResponse { ok: bool },
     Request(RequestData),
 }
 
@@ -68,6 +61,9 @@ unsafe impl Send for WsMessage {}
 unsafe impl Sync for WsMessage {}
 
 type ThingMap = DashMap<String, Vec<Sender<WsMessage>>>;
+
+#[catch(default)]
+fn default_catcher(_: Status, _: &Request) {}
 
 #[get("/send/<id>", data = "<input>")]
 async fn get(id: &str, auth: AuthService, map: &State<ThingMap>, input: RequestData) -> Status {
@@ -104,9 +100,23 @@ async fn patch(id: &str, auth: AuthService, map: &State<ThingMap>, input: Reques
     handle(id, auth, map, input).await
 }
 
-#[post("/register")]
-async fn register(new_auth: NewAuth) -> (Status, Json<NewAuth>) {
-    (Status::Created, Json(new_auth))
+#[post("/register/random")]
+async fn register_random(auth_service: NewAuthService) -> Result<(Status, Json<Auth>), Status> {
+    match auth_service.save_random().await {
+        Ok(auth) => Ok((Status::Ok, Json(auth))),
+        Err(s) => Err(s),
+    }
+}
+
+#[post("/register", format = "json", data = "<auth>")]
+async fn register(
+    auth: Json<Auth>,
+    auth_service: NewAuthService,
+) -> Result<(Status, Json<Auth>), Status> {
+    match auth_service.save(auth.0).await {
+        Ok(auth) => Ok((Status::Ok, Json(auth))),
+        Err(s) => Err(s),
+    }
 }
 
 // TODO clear out sockets and auths after some time
@@ -127,30 +137,26 @@ async fn handle(
     }
     let mut has_sent = false;
     if let Some(mut senders) = map.get_mut(id) {
+        println!("Found senders");
         for sender in senders.value() {
+            println!("Trying send");
             if !sender.is_closed() {
+                println!("Sending");
                 has_sent = true;
-                if let Err(e) = sender
-                    .clone()
-                    .send(WsMessage::Formatted(InOutMessage::Request(input.clone())))
-                    .await
-                {
+                if let Err(e) = sender.clone().send(WsMessage::Request(input.clone())).await {
                     eprintln!("Send Error (closing channel): {}", e);
                     sender.clone().close_channel();
                 };
             }
         }
 
-        senders.value_mut().retain(|sender| sender.is_closed());
-    } else {
-        return Status::NotFound;
+        senders.value_mut().retain(|sender| !sender.is_closed());
     }
-    if has_sent {
-        return Status::Accepted;
+    if !has_sent {
+        println!("Removing, as nothing has been sent");
+        map.remove(id);
     }
-    println!("Removing, as nothing has been sent");
-    map.remove(id);
-    Status::NotFound
+    Status::Accepted
 }
 
 enum MyMessage {
@@ -204,7 +210,7 @@ fn websocket<'r>(
                                 yield Message::Close(None);
                                 break;
                             }
-                            WsMessage::Formatted(msg) => yield serde_json::to_string(&msg).unwrap_or("ERROR".to_string()).into()
+                            WsMessage::Request(req) => yield serde_json::to_string(&req).unwrap_or("ERROR".to_string()).into()
                         }
                     }
                 }
@@ -215,22 +221,16 @@ fn websocket<'r>(
     }
 }
 
-fn load_config() -> Result<Config, ()> {
-    let builder = Config::builder().add_source(ConfigFile::new("config.ini", FileFormat::Ini));
-
-    match builder.build() {
-        Ok(config) => Ok(config),
-        Err(e) => {
-            eprintln!("Could not load config! {}", e);
-            Err(())
-        }
-    }
-}
-
 #[get("/<_..>")]
 async fn ui() -> NamedFile {
     println!("Request");
     NamedFile::open(ANGULAR_INDEX.as_path()).await.unwrap()
+}
+
+#[derive(Deserialize)]
+struct Config {
+    ui_path: PathBuf,
+    my_epoch: String,
 }
 
 #[launch]
@@ -239,17 +239,39 @@ fn rocket() -> _ {
         .manage(ThingMap::new())
         .mount(
             "/",
-            routes![get, put, post, delete, head, options, patch, websocket, register, validate],
+            routes![
+                get,
+                put,
+                post,
+                delete,
+                head,
+                options,
+                patch,
+                websocket,
+                register,
+                validate,
+                register_random
+            ],
         )
-        .mount("/ui", FileServer::from(UI_PATH.as_str()).rank(-5))
+        .register("/", catchers![default_catcher])
         .mount("/ui", routes![ui]);
-    auth_db::attach_db(r).attach(AdHoc::on_shutdown("Close Websockets", |r| {
+
+    let f = r.figment();
+    let config: Config = f.extract_inner("req").expect("No config");
+
+    let r = r.mount(
+        "/ui",
+        FileServer::from(&CONFIG.get_or_init(move || config).ui_path).rank(-5),
+    );
+
+    auth::attach_db(r).attach(AdHoc::on_shutdown("Close Websockets", |r| {
         Box::pin(async move {
             if let Some(thingies) = r.state::<ThingMap>() {
                 for mut i in thingies.iter_mut() {
                     let key = i.key().clone();
                     for s in i.value_mut() {
                         if !s.is_closed() {
+                            println!("Shutting down {key}");
                             if let Err(e) = s.send(WsMessage::Shutdown).await {
                                 eprintln!("Could not shut down {key}: {e}")
                             } else {

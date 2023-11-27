@@ -62,22 +62,32 @@
     <h2>Host</h2>
     <p>{{ requestEvent.remote.clientIp || "None" }}</p>
   </mat-expansion-panel>
-  <mat-expansion-panel *ngIf="canShowFormatted">
+  <!-- <mat-expansion-panel *ngIf="canShowFormatted">
     <mat-expansion-panel-header>
       <mat-panel-title>Body</mat-panel-title>
+    </mat-expansion-panel-header>
+    <app-request-body [requestEvent]="requestEvent"></app-request-body>
+  </mat-expansion-panel> -->
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      <mat-panel-title>Raw Body</mat-panel-title>
       <mat-panel-description>{{
         requestEvent.contentType
       }}</mat-panel-description>
     </mat-expansion-panel-header>
-    <app-request-body [requestEvent]="requestEvent"></app-request-body>
-  </mat-expansion-panel>
-  <mat-expansion-panel>
-    <mat-expansion-panel-header>
-      <mat-panel-title>Raw Body</mat-panel-title>
-    </mat-expansion-panel-header>
-    <pre
-      *ngIf="requestEvent.body"
-    ><code [highlight]="requestEvent.body" [lineNumbers]="true"></code></pre>
-    <pre *ngIf="!requestEvent.body"><i>No Body</i></pre>
+    @if(requestEvent.body) {
+    <a
+      mat-flat-button
+      color="accent"
+      href="data:{{ requestEvent.contentType }};base64,{{
+        requestEvent.body.base64
+      }}"
+      download="raw-body.{{ downloadExtension }}"
+      ><mat-icon>download</mat-icon>Download</a
+    >
+    <pre><code [highlight]="requestEvent.body.raw" [lineNumbers]="true"></code></pre>
+    } @else {
+    <pre><i>No Body</i></pre>
+    }
   </mat-expansion-panel>
 </mat-accordion>

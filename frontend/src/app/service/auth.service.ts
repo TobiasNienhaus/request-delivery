@@ -16,9 +16,31 @@ export class AuthService {
     }
   }
 
-  async register_new(): Promise<string> {
-    this.cookies.delete('token');
+  async registerNew(id: string, token: string): Promise<string> {
+    this.clearToken();
     let res = await fetch(BASE_PATH + '/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ id: id, token: token }),
+    });
+    if (res.status < 300) {
+      let json = await res.json();
+      if ('id' in json && 'token' in json) {
+        this.token = json['token'];
+        this.cookies.set('token', json['token']);
+        return json['id'];
+      }
+      throw 'Unauthorized';
+    } else {
+      throw 'Unauthorized';
+    }
+  }
+
+  async registerRandom(): Promise<string> {
+    this.cookies.delete('token');
+    let res = await fetch(BASE_PATH + '/register/random', {
       method: 'POST',
     });
     if (res.status < 300) {
@@ -38,14 +60,14 @@ export class AuthService {
     return this.token !== undefined;
   }
 
-  async validate_stored_for_id(id: string): Promise<boolean> {
+  async validateStored(id: string): Promise<boolean> {
     if (!this.has_token()) {
       return false;
     }
-    return await this.validate_for_id(id, this.token || '');
+    return await this.validate(id, this.token || '');
   }
 
-  async validate_for_id(id: string, auth: string): Promise<boolean> {
+  async validate(id: string, auth: string): Promise<boolean> {
     let res = await fetch(BASE_PATH + '/validate/' + id, {
       method: 'HEAD',
       headers: { 'X-Auth': auth },
@@ -54,5 +76,15 @@ export class AuthService {
       return true;
     }
     return false;
+  }
+
+  async clearToken() {
+    this.cookies.delete('token');
+    this.token = undefined;
+  }
+
+  async setToken(token: string) {
+    this.cookies.set('token', token);
+    this.token = token;
   }
 }

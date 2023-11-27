@@ -34,6 +34,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { ConnectionInfoBottomSheetComponent } from './connection/connection-info-bottom-sheet/connection-info-bottom-sheet.component';
 import { QrCodeModule } from 'ng-qrcode';
+import { MatSelectModule } from '@angular/material/select';
+import { ReactiveFormsModule } from '@angular/forms';
 
 @NgModule({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -67,20 +69,15 @@ import { QrCodeModule } from 'ng-qrcode';
     MatFormFieldModule,
     MatInputModule,
     QrCodeModule,
+    MatSelectModule,
+    ReactiveFormsModule,
   ],
   providers: [
     {
       provide: HIGHLIGHT_OPTIONS,
       useValue: <HighlightOptions>{
         fullLibraryLoader: () => import('highlight.js'),
-        lineNumbersLoader: () => import('ngx-highlightjs/line-numbers'), // Optional, only if you want the line numbers
-        // languages: {
-        //   javascript: () => import('highlight.js/lib/languages/javascript'),
-        //   css: () => import('highlight.js/lib/languages/css'),
-        //   xml: () => import('highlight.js/lib/languages/xml'),
-        //   plaintext: () => import('highlight.js/lib/languages/plaintext'),
-        //   graphql: () => import('highlight.js/lib/languages/graphql'),
-        // },
+        lineNumbersLoader: () => import('ngx-highlightjs/line-numbers'),
       },
     },
     CookieService,
@@ -91,4 +88,3 @@ export class AppModule {}
 
 // TODO QR Code with credentials so you can view the calls on another device
 // TODO Option to copy X-Auth-Token
-// TODO Option to generate Curl --> https://www.npmjs.com/package/curl-generator

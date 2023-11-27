@@ -42,11 +42,7 @@ const SHOW_CODE_TYPES: ContentType[] = [
   ...CODE_TYPES,
 ];
 
-const SHOW_INTERACTIVE_TYPES: ContentType[] = [
-  ...JSON_TYPES,
-  ...XML_TYPES,
-  ...FORM_TYPES,
-];
+const SHOW_INTERACTIVE_TYPES: ContentType[] = [...JSON_TYPES, ...XML_TYPES];
 
 export function canShowCode(ct: string): boolean {
   return (

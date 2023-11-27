@@ -25,3 +25,8 @@ body {
 .cdk-global-scrollblock {
   overflow: hidden; // TODO very hacky
 }
+
+.hljs {
+  @apply border;
+  background: none !important;
+}

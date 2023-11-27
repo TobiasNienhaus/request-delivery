@@ -1,36 +1,65 @@
 <div
-  class="w-full h-full flex flex-col md:flex-row items-center app-background box-border p-8 py-16"
+  class="w-full h-full flex flex-col md:flex-row items-center app-background box-border px-16 py-16"
 >
   @if (!large) {
   <div class="grow"></div>
   }
-  <div [class.grow]="large" class="p-8 text-center">
-    <button
-      mat-raised-button
-      color="accent"
-      (click)="registerNew()"
-      [disabled]="loading"
-    >
-      Create New
-    </button>
+  <div [class.grow]="large" class="p-8 text-right" [class.w-full]="!large">
+    <form class="flex flex-col ml-auto" [class.max-w-lg]="large">
+      <mat-form-field appearance="outline">
+        <mat-label>ID</mat-label>
+        <input matInput [formControl]="newId" />
+        @if (idTooShort()) {
+        <mat-hint class="text-white"
+          >Will be {{ suspectedId() }} (X will be random)</mat-hint
+        >
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" #newToken>
+        <mat-label>Token</mat-label>
+        <input matInput />
+      </mat-form-field>
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="registerCustom()"
+        [disabled]="loading"
+      >
+        Set Credentials
+      </button>
+      <div class="py-4 text-center"><i>Or</i></div>
+      <button
+        mat-stroked-button
+        color="primary"
+        (click)="registerRandom()"
+        [disabled]="loading"
+      >
+        Generate Random
+      </button>
+    </form>
   </div>
   <mat-divider
     [class]="large ? 'h-full' : 'w-full'"
     [vertical]="large"
   ></mat-divider>
-  <div [class.grow]="large" class="grow p-8 text-center">
-    <form>
-      <mat-form-field>
+  <div [class.grow]="large" class="p-8 text-left" [class.w-full]="!large">
+    <form class="flex flex-col" [class.max-w-lg]="large">
+      <mat-form-field appearance="outline">
         <mat-label>Input</mat-label>
-        <input matInput />
+        <input matInput [formControl]="existingId" />
       </mat-form-field>
-      <mat-form-field>
-        <mat-label>Select</mat-label>
-        <mat-select>
-          <mat-option value="one">First option</mat-option>
-          <mat-option value="two">Second option</mat-option>
-        </mat-select>
+      <mat-form-field appearance="outline">
+        <mat-label>Input</mat-label>
+        <input matInput [formControl]="existingToken" />
       </mat-form-field>
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="connectExisting()"
+        [disabled]="loading"
+      >
+        Connect to existing
+      </button>
     </form>
   </div>
   @if (!large) {

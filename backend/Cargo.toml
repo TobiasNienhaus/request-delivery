@@ -24,3 +24,4 @@ rocket_db_pools = { version = "=0.1.0-rc.4", features = [
     "sqlx_sqlite",
     "sqlx_macros",
 ] }
+base64 = "0.21"
