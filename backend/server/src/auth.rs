@@ -11,12 +11,7 @@ use rocket_db_pools::{
     Connection, Database,
 };
 use serde::{Deserialize, Serialize};
-
-fn custom_timestamp() -> i64 {
-    println!("{:?}", chrono::offset::Local::now().naive_local());
-    let duration = MY_EPOCH.signed_duration_since(chrono::offset::Local::now().naive_local());
-    -duration.num_seconds()
-}
+use shared::custom_timestamp;
 
 #[derive(Database)]
 #[database("auth")]
@@ -64,6 +59,10 @@ impl Auth {
             id: nanoid!(),
             token: nanoid!(),
         }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
     }
 }
 
@@ -178,7 +177,7 @@ impl NewAuthService {
         sqlx::query("INSERT OR FAIL INTO auth (id, token, ts) VALUES (?, ?, ?);")
             .bind(&auth.id)
             .bind(&auth.token)
-            .bind(custom_timestamp())
+            .bind(custom_timestamp(*MY_EPOCH))
             .execute(&mut **self.db)
             .await
             .map_err(|e| {

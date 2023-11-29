@@ -12,11 +12,12 @@ use rocket::http::Status;
 use rocket::serde::json::Json;
 use std::path::PathBuf;
 use std::sync::OnceLock;
+use ws::frame::{CloseCode, CloseFrame};
 
 use lazy_static::lazy_static;
 use rocket::request::FromParam;
-use rocket::serde::Deserialize;
 use rocket::{Request, State};
+use shared::{read_config, Config};
 use uuid::{Error, Uuid};
 use ws::Message;
 
@@ -24,17 +25,19 @@ mod auth;
 use auth::{Auth, AuthService, NewAuthService};
 mod request_data;
 use request_data::RequestData;
+mod cleanup;
 
 static AUTH_HEADER: &'static str = "X-Auth";
 
-static CONFIG: OnceLock<Config> = OnceLock::new();
+static CONFIG_PATH: OnceLock<String> = OnceLock::new();
+// static CONFIG: OnceLock<Config> = OnceLock::new();
 
 lazy_static! {
-    static ref ANGULAR_INDEX: PathBuf = CONFIG.get().unwrap().ui_path.join("index.html");
-    static ref MY_EPOCH: NaiveDateTime =
-        NaiveDateTime::parse_from_str(&CONFIG.get().unwrap().my_epoch, "%Y-%m-%d %T")
-            .expect("Could not parse thing")
-            .into();
+    static ref CONFIG: Config =
+        read_config(CONFIG_PATH.get().unwrap()).expect("Could not parse config");
+    static ref ANGULAR_INDEX: PathBuf = CONFIG.ui_path().join("index.html");
+    static ref MY_EPOCH: NaiveDateTime = CONFIG.get_epoch();
+    static ref CLEANUP_TOKEN: String = nanoid::nanoid!(64);
 }
 
 #[derive(Clone, Copy)]
@@ -52,8 +55,10 @@ impl<'a> FromParam<'a> for ID {
 }
 
 #[derive(Clone)]
-enum WsMessage {
+pub enum WsMessage {
     Shutdown,
+    ServerShutdown,
+    TokenExpired,
     Request(RequestData),
 }
 
@@ -209,7 +214,19 @@ fn websocket<'r>(
                             WsMessage::Shutdown => {
                                 yield Message::Close(None);
                                 break;
-                            }
+                            },
+                            WsMessage::ServerShutdown => {
+                                yield Message::Close(Some(CloseFrame {
+                                    code: CloseCode::Away,
+                                    reason: std::borrow::Cow::Borrowed("SERVER")
+                                }))
+                            },
+                            WsMessage::TokenExpired => {
+                                yield Message::Close(Some(CloseFrame {
+                                    code: CloseCode::Library(4001),
+                                    reason: std::borrow::Cow::Borrowed("SERVER")
+                                }))
+                            },
                             WsMessage::Request(req) => yield serde_json::to_string(&req).unwrap_or("ERROR".to_string()).into()
                         }
                     }
@@ -227,11 +244,11 @@ async fn ui() -> NamedFile {
     NamedFile::open(ANGULAR_INDEX.as_path()).await.unwrap()
 }
 
-#[derive(Deserialize)]
-struct Config {
-    ui_path: PathBuf,
-    my_epoch: String,
-}
+// #[derive(Deserialize)]
+// struct Config {
+//     ui_path: PathBuf,
+//     my_epoch: String,
+// }
 
 #[launch]
 fn rocket() -> _ {
@@ -253,16 +270,22 @@ fn rocket() -> _ {
                 register_random
             ],
         )
+        .mount("/admin", routes![cleanup::cleanup_tokens])
         .register("/", catchers![default_catcher])
         .mount("/ui", routes![ui]);
 
     let f = r.figment();
-    let config: Config = f.extract_inner("req").expect("No config");
+    let config_path = f
+        .find_value("req.config_path")
+        .expect("Missing Config Path!");
+    let config_path = config_path
+        .into_string()
+        .expect("Config Path is no string of mine");
+    CONFIG_PATH.get_or_init(move || config_path);
 
-    let r = r.mount(
-        "/ui",
-        FileServer::from(&CONFIG.get_or_init(move || config).ui_path).rank(-5),
-    );
+    let r = r.mount("/ui", FileServer::from(CONFIG.ui_path()).rank(-5));
+
+    cleanup::init();
 
     auth::attach_db(r).attach(AdHoc::on_shutdown("Close Websockets", |r| {
         Box::pin(async move {
@@ -272,7 +295,7 @@ fn rocket() -> _ {
                     for s in i.value_mut() {
                         if !s.is_closed() {
                             println!("Shutting down {key}");
-                            if let Err(e) = s.send(WsMessage::Shutdown).await {
+                            if let Err(e) = s.send(WsMessage::ServerShutdown).await {
                                 eprintln!("Could not shut down {key}: {e}")
                             } else {
                                 println!("Shutdown for {key} successful")

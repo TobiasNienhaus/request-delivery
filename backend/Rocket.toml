@@ -6,6 +6,7 @@ port = 18234
 url = "./auth.sqlite"
 
 [default.req]
+config_path = "./config.ini"
 ui_path = "../frontend/dist/frontend"
 my_epoch = "2021-11-22 0:0:0"
 cleanup_interval = 5

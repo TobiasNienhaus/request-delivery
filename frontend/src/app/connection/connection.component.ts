@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Component, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RequestData, DEFAULT_REQUEST } from '../model/request';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { IClipboardResponse } from 'ngx-clipboard';
@@ -10,74 +10,45 @@ import {
   MatBottomSheetRef,
 } from '@angular/material/bottom-sheet';
 import { ConnectionInfoBottomSheetComponent } from './connection-info-bottom-sheet/connection-info-bottom-sheet.component';
+import { firstValueFrom } from 'rxjs';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { MatSidenav } from '@angular/material/sidenav';
+
+const BREAKPOINT = '(min-width: 768px)';
 
 @Component({
   selector: 'app-connection',
   templateUrl: './connection.component.html',
   styleUrls: ['./connection.component.scss'],
 })
-export class ConnectionComponent {
+export class ConnectionComponent implements OnInit {
   selectedEvent?: RequestData;
   websocket?: WebSocket;
   id?: string;
   broken = true;
+  isMobile = true;
 
-  events: RequestData[] = [
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-    // { ...DEFAULT_REQUEST },
-    // { ...DEFAULT_REQUEST, method: 'DELETE' },
-    // { ...DEFAULT_REQUEST, method: 'HEAD' },
-    // { ...DEFAULT_REQUEST, method: 'PATCH' },
-    // { ...DEFAULT_REQUEST, method: 'PUT' },
-  ];
+  @ViewChild(MatSidenav)
+  sidenav!: MatSidenav;
+
+  events: RequestData[] = [];
 
   constructor(
     private route: ActivatedRoute,
     private _snackbar: MatSnackBar,
     private _bottomSheet: MatBottomSheet,
     private authService: AuthService,
-    router: Router
+    private router: Router,
+    private observer: BreakpointObserver
   ) {
+    this.isMobile = !observer.isMatched(BREAKPOINT);
+    console.log(this.isMobile);
     if (!authService.has_token()) {
       router.navigate(['ui']);
       return;
     }
     this.selectedEvent = this.events[0];
-    this.route.paramMap.subscribe((params) => {
+    firstValueFrom(this.route.paramMap).then((params) => {
       let id = params.get('id');
       this.id = id || undefined;
       if (this.id) {
@@ -87,6 +58,16 @@ export class ConnectionComponent {
         console.error('Missing ID');
       }
     });
+  }
+
+  ngOnInit() {
+    this.observer.observe(BREAKPOINT).subscribe((screenSize) => {
+      this.isMobile = !screenSize.matches;
+    });
+  }
+
+  toggleMenu() {
+    this.sidenav.toggle();
   }
 
   get eventsString(): string {
@@ -115,10 +96,7 @@ export class ConnectionComponent {
 
   closeConnection() {
     if (this.websocket) {
-      this.websocket.close();
-      this._snackbar.open('Closed WebSocket Connection', 'Ok', {
-        duration: 5000,
-      });
+      this.websocket.close(1000, 'CLIENT');
     }
   }
 
@@ -137,15 +115,43 @@ export class ConnectionComponent {
     );
   }
 
+  goHome() {
+    this.authService.clearToken();
+    this.router.navigate(['/']);
+    this.broken = true;
+  }
+
   createNewWebsocketConnection() {
     this.websocket = new WebSocket(
-      `ws://localhost:18234/connect/${this.id}?token=${this.authService.token}`
+      `ws://${location.hostname}:18234/connect/${this.id}?token=${this.authService.token}`
     );
     this.websocket.addEventListener('message', (event) => {
       let newEvent: RequestData = JSON.parse(event.data);
       newEvent.time = new Date(newEvent.time);
       if (!this.selectedEvent) this.selectedEvent = newEvent;
       this.events = [newEvent, ...this.events];
+    });
+    this.websocket.addEventListener('close', (event) => {
+      switch (event.code) {
+        case 1001: // Going Away
+          this._snackbar.open(`Server is shutting down.`, 'Ok', {
+            duration: 5000,
+          });
+          this.authService.clearToken();
+          this.broken = true;
+          break;
+        case 4001: // Unauthorized
+          this._snackbar.open(`Session has expired.`, 'Ok', {
+            duration: 5000,
+          });
+          this.authService.clearToken();
+          this.broken = true;
+          break;
+        default: // Anythign else
+          this._snackbar.open(`WebSocket has been closed.`, 'Ok', {
+            duration: 5000,
+          });
+      }
     });
   }
 }

@@ -1,6 +1,6 @@
 <div class="flex flex-col h-screen">
   <mat-toolbar color="primary">
-    <button mat-icon-button aria-label="Menu icon">
+    <button mat-icon-button aria-label="Menu icon" (click)="toggleMenu()">
       <mat-icon>menu</mat-icon>
     </button>
     <span class="overflow-hidden grow"
@@ -25,7 +25,7 @@
     <mat-drawer-content>Main content</mat-drawer-content>
   </mat-drawer-container> -->
   <mat-sidenav-container class="example-sidenav-container grow" autosize>
-    <mat-sidenav #snav mode="side" opened>
+    <mat-sidenav #snav [mode]="isMobile ? 'over' : 'side'" [opened]="!isMobile">
       <div class="flex flex-col h-full">
         <mat-nav-list class="overflow-auto overflow-x-hidden">
           @for (event of events; track event.time) {
@@ -45,7 +45,12 @@
         @if (!broken) {
         <div class="p-2 px-4">
           @if (hasConnection()) {
-          <button class="w-full" mat-button (click)="closeConnection()">
+          <button
+            class="w-full"
+            mat-button
+            color="accent"
+            (click)="closeConnection()"
+          >
             <mat-icon>close</mat-icon>
             Close
           </button>
@@ -58,12 +63,20 @@
         </div>
 
         }
-        <div class="p-2 px-4 flex items-center">
-          <div class="grow">Connection Info</div>
-          <button mat-icon-button (click)="openInfoSheet()">
-            <mat-icon>info_outlined</mat-icon>
+        <div class="p-2 px-4">
+          <button class="w-full" mat-button color="accent" (click)="goHome()">
+            <mat-icon>home</mat-icon>
+            Go Home
           </button>
         </div>
+        @if (!broken) {
+        <div class="p-2 px-4">
+          <button mat-button color="primary" (click)="openInfoSheet()">
+            <mat-icon>info_outlined</mat-icon>
+            Connection Info
+          </button>
+        </div>
+        }
       </div>
     </mat-sidenav>
 

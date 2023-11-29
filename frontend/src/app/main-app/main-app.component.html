@@ -15,9 +15,9 @@
         >
         }
       </mat-form-field>
-      <mat-form-field appearance="outline" #newToken>
+      <mat-form-field appearance="outline">
         <mat-label>Token</mat-label>
-        <input matInput />
+        <input matInput [formControl]="newToken" />
       </mat-form-field>
       <button
         mat-raised-button
@@ -45,18 +45,18 @@
   <div [class.grow]="large" class="p-8 text-left" [class.w-full]="!large">
     <form class="flex flex-col" [class.max-w-lg]="large">
       <mat-form-field appearance="outline">
-        <mat-label>Input</mat-label>
+        <mat-label>ID</mat-label>
         <input matInput [formControl]="existingId" />
       </mat-form-field>
       <mat-form-field appearance="outline">
-        <mat-label>Input</mat-label>
+        <mat-label>Token</mat-label>
         <input matInput [formControl]="existingToken" />
       </mat-form-field>
       <button
         mat-raised-button
         color="primary"
         (click)="connectExisting()"
-        [disabled]="loading"
+        [disabled]="loading || existingId.invalid"
       >
         Connect to existing
       </button>

@@ -2,7 +2,8 @@ import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { AuthService } from '../service/auth.service';
 import { Router } from '@angular/router';
-import { FormControl } from '@angular/forms';
+import { FormControl, Validators } from '@angular/forms';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 const BREAKPOINT = '(min-width: 768px)';
 
@@ -15,7 +16,8 @@ export class MainAppComponent implements OnInit {
   constructor(
     private breakpointObserver: BreakpointObserver,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private _snackbar: MatSnackBar
   ) {
     this.authService.clearToken();
   }
@@ -23,7 +25,10 @@ export class MainAppComponent implements OnInit {
   newId = new FormControl('');
   newToken = new FormControl('');
 
-  existingId = new FormControl('');
+  existingId = new FormControl('', [
+    Validators.required,
+    Validators.minLength(8),
+  ]);
   existingToken = new FormControl('');
 
   large: boolean = false;
@@ -44,13 +49,21 @@ export class MainAppComponent implements OnInit {
   }
 
   async registerCustom() {
+    console.log('CUSTOM');
     this.loading = true;
-    let id = await this.authService.registerNew(
-      this.newId.value || '',
-      this.newToken.value || ''
-    );
+    try {
+      console.log('NEW TOKEN', this.newToken.value);
+      let id = await this.authService.registerNew(
+        this.newId.value || '',
+        this.newToken.value || ''
+      );
+      this.router.navigate(['results', id]);
+    } catch (e) {
+      this._snackbar.open('Could not create credentials.', 'OK', {
+        duration: 5000,
+      });
+    }
     this.loading = false;
-    this.router.navigate(['results', id]);
   }
 
   async connectExisting() {
@@ -61,6 +74,9 @@ export class MainAppComponent implements OnInit {
       this.authService.setToken(token);
       this.router.navigate(['results', id]);
     } else {
+      this._snackbar.open('Invalid Credentials.', 'OK', {
+        duration: 5000,
+      });
       this.loading = false;
     }
   }
