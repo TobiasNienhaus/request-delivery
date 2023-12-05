@@ -1,9 +1,10 @@
 import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../service/auth.service';
 import { Router } from '@angular/router';
 import { FormControl, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { LegalLinkComponent } from '../legal/legal-link/legal-link.component';
 
 const BREAKPOINT = '(min-width: 768px)';
 
@@ -49,10 +50,8 @@ export class MainAppComponent implements OnInit {
   }
 
   async registerCustom() {
-    console.log('CUSTOM');
     this.loading = true;
     try {
-      console.log('NEW TOKEN', this.newToken.value);
       let id = await this.authService.registerNew(
         this.newId.value || '',
         this.newToken.value || ''

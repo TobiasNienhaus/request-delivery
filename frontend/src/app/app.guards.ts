@@ -12,7 +12,12 @@ export const hasValidToken: CanActivateFn = async (
   _: RouterStateSnapshot
 ) => {
   let id = route.paramMap.get('id');
-  return id !== null && (await inject(AuthService).validateStored(id));
+  let router = inject(Router);
+  if (id !== null && (await inject(AuthService).validateStored(id))) {
+    return true;
+  } else {
+    return router.createUrlTree(['/'], { relativeTo: null });
+  }
 };
 
 export const reconnect: CanActivateFn = async (

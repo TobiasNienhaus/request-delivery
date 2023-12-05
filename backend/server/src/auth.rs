@@ -123,13 +123,11 @@ impl<'r, const ALLOW_QUERY: bool> AuthService<ALLOW_QUERY> {
     }
 
     pub async fn check(&mut self, id: &str) -> Result<(), Status> {
-        println!("Checking token [{}] and id [{}]", self.token, id);
         if let Ok(auth) = sqlx::query_as::<_, Auth>("SELECT id, token FROM auth WHERE id = ?;")
             .bind(id)
             .fetch_one(&mut **self.db)
             .await
         {
-            println!("=> [{}] has token [{}]", id, auth.token);
             return if auth.token.is_empty() || auth.token.eq(&self.token) {
                 Ok(())
             } else {

@@ -1,68 +1,71 @@
 <div
-  class="w-full h-full flex flex-col md:flex-row items-center app-background box-border px-16 py-16"
+  class="flex flex-col w-full h-full items-center app-background box-border px-16 py-16"
 >
-  @if (!large) {
-  <div class="grow"></div>
-  }
-  <div [class.grow]="large" class="p-8 text-right" [class.w-full]="!large">
-    <form class="flex flex-col ml-auto" [class.max-w-lg]="large">
-      <mat-form-field appearance="outline">
-        <mat-label>ID</mat-label>
-        <input matInput [formControl]="newId" />
-        @if (idTooShort()) {
-        <mat-hint class="text-white"
-          >Will be {{ suspectedId() }} (X will be random)</mat-hint
+  <div class="w-full grow flex flex-col md:flex-row items-center">
+    @if (!large) {
+    <div class="grow"></div>
+    }
+    <div [class.grow]="large" class="p-8 text-right" [class.w-full]="!large">
+      <form class="flex flex-col ml-auto" [class.max-w-lg]="large">
+        <mat-form-field appearance="outline">
+          <mat-label>ID</mat-label>
+          <input matInput [formControl]="newId" />
+          @if (idTooShort()) {
+          <mat-hint class="text-white"
+            >Will be {{ suspectedId() }} (X will be random)</mat-hint
+          >
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Token</mat-label>
+          <input matInput [formControl]="newToken" />
+        </mat-form-field>
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="registerCustom()"
+          [disabled]="loading"
         >
-        }
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Token</mat-label>
-        <input matInput [formControl]="newToken" />
-      </mat-form-field>
-      <button
-        mat-raised-button
-        color="primary"
-        (click)="registerCustom()"
-        [disabled]="loading"
-      >
-        Set Credentials
-      </button>
-      <div class="py-4 text-center"><i>Or</i></div>
-      <button
-        mat-stroked-button
-        color="primary"
-        (click)="registerRandom()"
-        [disabled]="loading"
-      >
-        Generate Random
-      </button>
-    </form>
+          Set Credentials
+        </button>
+        <div class="py-4 text-center"><i>Or</i></div>
+        <button
+          mat-stroked-button
+          color="primary"
+          (click)="registerRandom()"
+          [disabled]="loading"
+        >
+          Generate Random
+        </button>
+      </form>
+    </div>
+    <mat-divider
+      [class]="large ? 'h-full' : 'w-full'"
+      [vertical]="large"
+    ></mat-divider>
+    <div [class.grow]="large" class="p-8 text-left" [class.w-full]="!large">
+      <form class="flex flex-col" [class.max-w-lg]="large">
+        <mat-form-field appearance="outline">
+          <mat-label>ID</mat-label>
+          <input matInput [formControl]="existingId" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Token</mat-label>
+          <input matInput [formControl]="existingToken" />
+        </mat-form-field>
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="connectExisting()"
+          [disabled]="loading || existingId.invalid"
+        >
+          Connect to existing
+        </button>
+      </form>
+    </div>
+    @if (!large) {
+    <div class="grow"></div>
+    }
   </div>
-  <mat-divider
-    [class]="large ? 'h-full' : 'w-full'"
-    [vertical]="large"
-  ></mat-divider>
-  <div [class.grow]="large" class="p-8 text-left" [class.w-full]="!large">
-    <form class="flex flex-col" [class.max-w-lg]="large">
-      <mat-form-field appearance="outline">
-        <mat-label>ID</mat-label>
-        <input matInput [formControl]="existingId" />
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Token</mat-label>
-        <input matInput [formControl]="existingToken" />
-      </mat-form-field>
-      <button
-        mat-raised-button
-        color="primary"
-        (click)="connectExisting()"
-        [disabled]="loading || existingId.invalid"
-      >
-        Connect to existing
-      </button>
-    </form>
-  </div>
-  @if (!large) {
-  <div class="grow"></div>
-  }
+  <app-legal-link></app-legal-link>
 </div>

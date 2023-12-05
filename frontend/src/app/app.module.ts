@@ -36,6 +36,7 @@ import { ConnectionInfoBottomSheetComponent } from './connection/connection-info
 import { QrCodeModule } from 'ng-qrcode';
 import { MatSelectModule } from '@angular/material/select';
 import { ReactiveFormsModule } from '@angular/forms';
+import { LegalLinkComponent } from './legal/legal-link/legal-link.component';
 
 @NgModule({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -49,6 +50,9 @@ import { ReactiveFormsModule } from '@angular/forms';
     ConnectionInfoBottomSheetComponent,
   ],
   imports: [
+    // OWN
+    LegalLinkComponent,
+    // Dependencies
     MatButtonModule,
     BrowserModule,
     AppRoutingModule,

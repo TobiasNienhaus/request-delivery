@@ -42,7 +42,6 @@ export class ConnectionComponent implements OnInit {
     private observer: BreakpointObserver
   ) {
     this.isMobile = !observer.isMatched(BREAKPOINT);
-    console.log(this.isMobile);
     if (!authService.has_token()) {
       router.navigate(['ui']);
       return;
